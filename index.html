@@ -103,6 +103,12 @@
   .editor-actions { display: flex; gap: 1.4vmin; justify-content: flex-end; margin-top: 2.4vmin; }
   #editsave { border: none; color: #fff; background: linear-gradient(180deg, #43c46a, #2f9d52); }
 
+  .voicerow { display: flex; gap: 1.4vmin; align-items: center; margin-bottom: 2.6vmin; }
+  .voicerow .vlbl { font-size: 3vmin; }
+  .voicerow select { flex: 1; min-width: 0; font: inherit; font-size: 2.5vmin; color: #f4f5f9;
+    background: #15151b; border: 1px solid rgba(255,255,255,.14); border-radius: 1.6vmin; padding: 1.4vmin; }
+  .voicerow button { font-size: 2.4vmin; padding: 1.4vmin 2.4vmin; white-space: nowrap; }
+
   .hidden { display: none !important; }
   @media (prefers-reduced-motion: reduce) { .cell.cur { animation: none; } .cell.flash { animation: none; } }
 </style>
@@ -128,6 +134,11 @@
   <div class="editor-card">
     <h2>Editar palavras</h2>
     <p class="hint">Troque o texto (e o emoji, se quiser). Use o mouse e o teclado.</p>
+    <div class="voicerow">
+      <span class="vlbl">🔊</span>
+      <select id="voicesel" aria-label="Voz"></select>
+      <button id="voicetest" type="button">▶︎ ouvir</button>
+    </div>
     <div id="editrows"></div>
     <div class="editor-actions">
       <button id="editcancel" type="button">Cancelar</button>
@@ -202,18 +213,40 @@ const header = document.getElementById("header");
 const statusEl = document.getElementById("status");
 const blinkfill = document.getElementById("blinkfill");
 
-function pickVoice() {
-  const vs = speechSynthesis.getVoices();
-  return vs.find(v => /pt[-_]?BR/i.test(v.lang)) || vs.find(v => /^pt/i.test(v.lang)) || null;
-}
-ttsVoice = pickVoice();
-speechSynthesis.onvoiceschanged = () => { ttsVoice = pickVoice(); };
+const VOICE_KEY = "voiceURI_v1";
+let voices = [];
 
-function speak(text) {
+// nota da voz: quanto maior, mais natural/simpática (e em pt-BR)
+function voiceScore(v) {
+  const lang = (v.lang || "").toLowerCase().replace("_", "-");
+  const name = (v.name || "").toLowerCase();
+  if (!lang.startsWith("pt")) return -1;            // só português
+  let s = lang.startsWith("pt-br") ? 100 : 60;
+  if (/natural|neural|premium|enhanced|aprimorad|online|wavenet|siri/.test(name)) s += 45;
+  if (/google/.test(name)) s += 30;                 // voz Google pt-BR (Android/Chrome) é boa
+  if (/luciana|francisca|maria|camila|thalita|joana|vit[oó]ria|brenda|giovanna|isabela|fernanda/.test(name)) s += 12;
+  if (/compact|comprimid|eloquence/.test(name)) s -= 30;   // versões robóticas antigas
+  if (v.localService === false) s += 5;
+  return s;
+}
+function ptVoicesSorted() {
+  return voices.filter(v => voiceScore(v) >= 0).sort((a, b) => voiceScore(b) - voiceScore(a));
+}
+function refreshVoices() {
+  voices = (speechSynthesis.getVoices() || []).slice();
+  const saved = localStorage.getItem(VOICE_KEY);
+  ttsVoice = (saved && voices.find(v => v.voiceURI === saved)) || ptVoicesSorted()[0] || null;
+}
+refreshVoices();
+speechSynthesis.onvoiceschanged = refreshVoices;
+
+function speak(text, voice) {
   try {
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = "pt-BR"; if (ttsVoice) u.voice = ttsVoice; u.rate = 1.0;
+    u.lang = "pt-BR";
+    const v = voice || ttsVoice; if (v) u.voice = v;
+    u.rate = 1.0; u.pitch = 1.06;   // tom levemente mais alto = mais simpático
     speechSynthesis.speak(u);
   } catch (e) {}
 }
@@ -349,7 +382,20 @@ const editrows = document.getElementById("editrows");
 const escAttr = s => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;")
   .replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+function fillVoices() {
+  const sel = document.getElementById("voicesel");
+  refreshVoices();
+  const list = ptVoicesSorted();
+  const pool = list.length ? list : voices;
+  if (!pool.length) { sel.innerHTML = '<option value="">Voz padrão do aparelho</option>'; return; }
+  sel.innerHTML = pool.map(v =>
+    `<option value="${escAttr(v.voiceURI)}">${escAttr(v.name)} · ${escAttr(v.lang)}</option>`).join("");
+  const cur = (ttsVoice && ttsVoice.voiceURI) || localStorage.getItem(VOICE_KEY) || "";
+  if (cur) sel.value = cur;
+}
+
 function openEditor() {
+  fillVoices();
   editrows.innerHTML = PHRASES.map((p, i) => `
     <div class="editrow">
       <input class="ed-icon" data-i="${i}" value="${escAttr(p.icon)}" maxlength="4" aria-label="Emoji ${i + 1}">
@@ -369,6 +415,11 @@ function saveEditor() {
     cells[i].querySelector(".lbl").textContent = PHRASES[i].label;
     cells[i].querySelector(".icon").textContent = PHRASES[i].icon;
   });
+  const uri = document.getElementById("voicesel").value;
+  if (uri) {
+    const v = voices.find(x => x.voiceURI === uri);
+    if (v) { ttsVoice = v; localStorage.setItem(VOICE_KEY, uri); }
+  }
   try {
     localStorage.setItem(PHRASE_KEY,
       JSON.stringify(PHRASES.map(p => ({ label: p.label, say: p.say, icon: p.icon }))));
@@ -379,6 +430,10 @@ function saveEditor() {
 document.getElementById("editbtn").addEventListener("click", openEditor);
 document.getElementById("editcancel").addEventListener("click", () => editor.classList.add("hidden"));
 document.getElementById("editsave").addEventListener("click", saveEditor);
+document.getElementById("voicetest").addEventListener("click", () => {
+  const v = voices.find(x => x.voiceURI === document.getElementById("voicesel").value);
+  speak("Oi! Estou aqui com você.", v);
+});
 editor.addEventListener("click", e => { if (e.target === editor) editor.classList.add("hidden"); });
 
 document.getElementById("startbtn").addEventListener("click", start);
