@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#141418" />
+<title>Comunicador — Sim · Não · Tchau · Te amo</title>
+<style>
+  :root { --gap: 2.4vmin; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; color: #eef0f4;
+    font-family: -apple-system, "SF Pro Rounded", "Segoe UI", system-ui, sans-serif;
+    background: radial-gradient(120% 90% at 50% -10%, #262633 0%, #16161c 55%, #101015 100%); }
+
+  #app { position: fixed; inset: 0; display: flex; flex-direction: column;
+    padding: calc(env(safe-area-inset-top) + 1.4vmin) 1.8vmin calc(env(safe-area-inset-bottom) + 1.4vmin); }
+
+  #header { text-align: center; font-size: 4.4vmin; font-weight: 800; letter-spacing: .3px;
+    min-height: 6vmin; display: flex; align-items: center; justify-content: center;
+    color: #f4f5f9; text-shadow: 0 1px 12px rgba(0,0,0,.4); transition: opacity .2s; }
+  #header .spoke { color: #6ce08a; }
+
+  #grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+    gap: var(--gap); margin: 1.6vmin 0; }
+
+  .cell { position: relative; border-radius: 4vmin; overflow: hidden;
+    border: 0.5vmin solid rgb(var(--c) / .45);
+    background:
+      radial-gradient(130% 100% at 50% 0%, rgb(var(--c) / .16), rgb(var(--c) / .03) 60%, transparent),
+      linear-gradient(180deg, #23232c, #1a1a22);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 2vmin 4vmin rgba(0,0,0,.35);
+    display: flex; align-items: center; justify-content: center; user-select: none;
+    transition: transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .18s, border-color .18s; }
+  .cell .content { position: relative; z-index: 2; display: flex; flex-direction: column;
+    align-items: center; gap: .4vmin; pointer-events: none; }
+  .cell .icon { font-size: 11vmin; line-height: 1; filter: drop-shadow(0 2px 6px rgba(0,0,0,.35)); }
+  .cell .lbl { font-size: 7.5vmin; font-weight: 800; color: rgb(var(--c)); letter-spacing: .3px; }
+  .cell .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0%;
+    background: linear-gradient(180deg, rgb(var(--c) / .10), rgb(var(--c) / .42));
+    transition: height .08s linear; z-index: 1; }
+  .cell .fill.ok { background: linear-gradient(180deg, rgba(60,230,90,.25), rgba(60,230,90,.6)); }
+
+  .cell.cur { border-color: rgb(var(--c)); transform: scale(1.035);
+    box-shadow: 0 0 0 .3vmin rgb(var(--c) / .35), 0 0 7vmin rgb(var(--c) / .55), 0 2vmin 4vmin rgba(0,0,0,.4);
+    animation: breathe 1.6s ease-in-out infinite; }
+  @keyframes breathe { 0%,100% { box-shadow: 0 0 0 .3vmin rgb(var(--c) / .30), 0 0 5vmin rgb(var(--c) / .40), 0 2vmin 4vmin rgba(0,0,0,.4); }
+                       50%     { box-shadow: 0 0 0 .3vmin rgb(var(--c) / .45), 0 0 9vmin rgb(var(--c) / .65), 0 2vmin 4vmin rgba(0,0,0,.4); } }
+  .cell.flash { animation: pop .5s ease; border-color: #56e87a; }
+  @keyframes pop { 0% { transform: scale(1); } 35% { transform: scale(1.07); } 100% { transform: scale(1); } }
+
+  #blinkbar { height: 1.3vmin; background: #2a2a33; border-radius: 1vmin; margin: .4vmin 7vmin .9vmin;
+    overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,.4); }
+  #blinkfill { height: 100%; width: 0%; border-radius: 1vmin;
+    background: linear-gradient(90deg, #3ce65a, #7ef0a0); transition: width .06s linear; }
+  #status { font-size: 2.3vmin; color: #9a9aa6; text-align: center; min-height: 3vmin;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+  #controls { display: flex; gap: 1.4vmin; justify-content: center; flex-wrap: wrap; margin-top: 1vmin; }
+  button { font: inherit; font-size: 2.7vmin; font-weight: 600; padding: 1.5vmin 3vmin;
+    border-radius: 100px; border: 1px solid rgba(255,255,255,.10); color: #e8e8ee;
+    background: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.03));
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); transition: transform .1s, background .15s; }
+  button:active { transform: scale(.95); background: rgba(255,255,255,.14); }
+
+  #cam { position: fixed; right: 1.8vmin; top: calc(env(safe-area-inset-top) + 1.2vmin);
+    width: 20vmin; max-width: 120px; aspect-ratio: 4/3; object-fit: cover; border-radius: 2vmin;
+    border: 1px solid rgba(255,255,255,.12); opacity: .9; transform: scaleX(-1);
+    box-shadow: 0 1vmin 3vmin rgba(0,0,0,.4); z-index: 5; }
+
+  #overlay { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; padding: 7vmin;
+    background: radial-gradient(120% 90% at 50% 0%, #262633, #131318); }
+  .badge { font-size: 13vmin; line-height: 1; margin-bottom: 1vmin; filter: drop-shadow(0 4px 14px rgba(0,0,0,.4)); }
+  #overlay h1 { font-size: 7vmin; font-weight: 800; margin: 0 0 1.5vmin;
+    background: linear-gradient(90deg, #7ef0a0, #5a8cfa, #f064af); -webkit-background-clip: text;
+    background-clip: text; color: transparent; }
+  #overlay p { font-size: 3vmin; color: #c2c2cc; max-width: 78vmin; line-height: 1.5; }
+  #startbtn { margin-top: 5vmin; font-size: 4.6vmin; font-weight: 700; padding: 3vmin 8vmin; color: #fff;
+    border: none; border-radius: 100px; box-shadow: 0 1.5vmin 4vmin rgba(47,125,70,.5);
+    background: linear-gradient(180deg, #43c46a, #2f9d52); }
+  #startbtn:active { transform: scale(.96); }
+  #err { color: #ff8080; font-size: 2.8vmin; margin-top: 3vmin; max-width: 80vmin; }
+  /* Botão pequeno só de mouse para editar as palavras */
+  #editbtn { position: fixed; left: 1.6vmin; bottom: calc(env(safe-area-inset-bottom) + 1.4vmin);
+    z-index: 30; width: 6vmin; height: 6vmin; max-width: 42px; max-height: 42px;
+    min-width: 30px; min-height: 30px; padding: 0; border-radius: 50%; font-size: 3vmin; line-height: 1;
+    opacity: .4; color: #cfd2da; transition: opacity .15s, background .15s; }
+  #editbtn:hover { opacity: 1; }
+
+  #editor { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center;
+    padding: 5vmin; background: rgba(8,8,12,.72); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+  .editor-card { width: min(560px, 92vw); border-radius: 3vmin; padding: 3.6vmin;
+    background: linear-gradient(180deg, #23232c, #1a1a22); border: 1px solid rgba(255,255,255,.12);
+    box-shadow: 0 3vmin 8vmin rgba(0,0,0,.55); }
+  .editor-card h2 { margin: 0 0 1vmin; font-size: 3.6vmin; color: #f4f5f9; text-align: center; }
+  .editor-card .hint { margin: 0 0 2.6vmin; font-size: 2.2vmin; color: #9a9aa6; text-align: center; }
+  .editrow { display: flex; gap: 1.4vmin; align-items: center; margin-bottom: 1.6vmin; }
+  .editrow input { font: inherit; color: #f4f5f9; background: #15151b;
+    border: 1px solid rgba(255,255,255,.14); border-radius: 1.6vmin; padding: 1.6vmin; }
+  .editrow .ed-icon { width: 14vmin; max-width: 80px; text-align: center; font-size: 3.6vmin; }
+  .editrow .ed-label { flex: 1; font-size: 3vmin; min-width: 0; }
+  .editor-actions { display: flex; gap: 1.4vmin; justify-content: flex-end; margin-top: 2.4vmin; }
+  #editsave { border: none; color: #fff; background: linear-gradient(180deg, #43c46a, #2f9d52); }
+
+  .hidden { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { .cell.cur { animation: none; } .cell.flash { animation: none; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">Pisque para falar</div>
+  <div id="grid"></div>
+  <div id="blinkbar"><div id="blinkfill"></div></div>
+  <div id="status">—</div>
+  <div id="controls">
+    <button id="calibbtn">👁 Calibrar piscada</button>
+    <button id="slower">− devagar</button>
+    <button id="faster">+ rápido</button>
+    <button id="eyebtn">Olho: dir.</button>
+  </div>
+</div>
+<video id="cam" playsinline muted autoplay></video>
+
+<button id="editbtn" type="button" title="Editar palavras (use o mouse)" aria-label="Editar palavras">✎</button>
+
+<div id="editor" class="hidden">
+  <div class="editor-card">
+    <h2>Editar palavras</h2>
+    <p class="hint">Troque o texto (e o emoji, se quiser). Use o mouse e o teclado.</p>
+    <div id="editrows"></div>
+    <div class="editor-actions">
+      <button id="editcancel" type="button">Cancelar</button>
+      <button id="editsave" type="button">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div id="overlay">
+  <div class="badge">💬</div>
+  <h1>Comunicador</h1>
+  <p><b>Sim · Não · Tchau · Te amo.</b><br>A tela percorre os botões; <b>pisque</b>
+     (feche o olho ~meio segundo) para falar o destacado. Tocar num botão também fala — bom para testar.<br><br>
+     Toque em <b>Começar</b> e permita o uso da câmera e do som.</p>
+  <button id="startbtn">Começar</button>
+  <div id="err"></div>
+</div>
+
+<script type="module">
+import { FaceLandmarker, FilesetResolver }
+  from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/vision_bundle.mjs";
+
+const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
+const WASM_URL  = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm";
+
+const PHRASES = [
+  { label: "Sim",    say: "Sim",    icon: "👍", c: "90 210 90"  },
+  { label: "Não",    say: "Não",    icon: "👎", c: "90 140 250" },
+  { label: "Tchau",  say: "Tchau",  icon: "👋", c: "245 185 70" },
+  { label: "Te amo", say: "Te amo", icon: "❤️", c: "240 100 175" },
+];
+
+const PHRASE_KEY = "phrases_v1";
+function loadPhrases() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(PHRASE_KEY) || "null");
+    if (!Array.isArray(arr)) return;
+    arr.forEach((p, i) => {
+      if (i >= PHRASES.length || !p) return;
+      if (typeof p.label === "string" && p.label.trim()) {
+        PHRASES[i].label = p.label.trim();
+        PHRASES[i].say   = (typeof p.say === "string" && p.say.trim()) ? p.say.trim() : p.label.trim();
+      }
+      if (typeof p.icon === "string" && p.icon.trim()) PHRASES[i].icon = p.icon.trim();
+    });
+  } catch (e) {}
+}
+loadPhrases();
+
+const CLOSE_SELECT = 0.25;  // s de olho fechado para selecionar
+const REFRACT      = 1.0;   // s minimos entre selecoes
+const HOLD         = 1.4;   // s congelado apos falar
+
+let faceLandmarker = null, video, running = false;
+let idx = 0, lastScan = 0, scanInterval = 1400;
+let thr = 0.5, blinkSrc = "right", blinkEMA = null;
+let armed = true, closedSince = null, lastSelect = 0;
+let spoken = null, flashIdx = -1, holdUntil = 0, progress = 0;
+let calib = null, ttsVoice = null;
+
+const grid = document.getElementById("grid");
+const cells = PHRASES.map((p, i) => {
+  const d = document.createElement("div");
+  d.className = "cell"; d.style.setProperty("--c", p.c);
+  d.innerHTML = `<div class="fill"></div><div class="content">
+      <span class="icon">${p.icon}</span><span class="lbl">${p.label}</span></div>`;
+  d.addEventListener("click", () => selectIndex(i));   // toque = falar (teste)
+  grid.appendChild(d);
+  return d;
+});
+const header = document.getElementById("header");
+const statusEl = document.getElementById("status");
+const blinkfill = document.getElementById("blinkfill");
+
+function pickVoice() {
+  const vs = speechSynthesis.getVoices();
+  return vs.find(v => /pt[-_]?BR/i.test(v.lang)) || vs.find(v => /^pt/i.test(v.lang)) || null;
+}
+ttsVoice = pickVoice();
+speechSynthesis.onvoiceschanged = () => { ttsVoice = pickVoice(); };
+
+function speak(text) {
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "pt-BR"; if (ttsVoice) u.voice = ttsVoice; u.rate = 1.0;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+function blinkScore(result) {
+  const bs = result.faceBlendshapes;
+  if (!bs || !bs.length) return null;
+  let l = 0, r = 0;
+  for (const c of bs[0].categories) {
+    if (c.categoryName === "eyeBlinkLeft") l = c.score;
+    else if (c.categoryName === "eyeBlinkRight") r = c.score;
+  }
+  if (blinkSrc === "left") return l;
+  if (blinkSrc === "max") return Math.max(l, r);
+  return r;
+}
+
+function selectIndex(i) {
+  speak(PHRASES[i].say);
+  spoken = PHRASES[i].label; flashIdx = i;
+  holdUntil = performance.now() + HOLD * 1000;
+  idx = 0;                // recomeça a varredura da primeira palavra
+  lastScan = holdUntil;   // 1ª palavra fica destacada um ciclo inteiro após a pausa
+}
+
+function startCalib() { calib = { phase: "open", t0: performance.now(), open: [], closed: [] }; }
+function handleCalib(now) {
+  const dur = 2600, b = blinkEMA;
+  if (calib.phase === "open") {
+    header.textContent = "Mantenha o olho ABERTO…";
+    if (b != null && now - calib.t0 > 600) calib.open.push(b);
+    if (now - calib.t0 >= dur) { calib.phase = "closed"; calib.t0 = now; }
+  } else {
+    header.textContent = "FECHE o olho e segure…";
+    if (b != null && now - calib.t0 > 600) calib.closed.push(b);
+    if (now - calib.t0 >= dur) {
+      const med = a => a.length ? a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)] : 0;
+      const o = med(calib.open), c = med(calib.closed);
+      thr = (c > o) ? o + 0.45 * (c - o) : 0.5;
+      localStorage.setItem("blinkThr", String(thr));
+      calib = null; armed = true; blinkEMA = null;
+      header.textContent = "Pisque para falar";
+    }
+  }
+}
+
+function updateUI() {
+  cells.forEach((d, i) => {
+    const cur = (i === idx && !spoken);
+    d.classList.toggle("cur", cur);
+    d.classList.toggle("flash", i === flashIdx);
+    const fill = d.querySelector(".fill");
+    if (cur && progress > 0) { fill.style.height = Math.min(progress, 1) * 100 + "%"; fill.classList.remove("ok"); }
+    else if (i === flashIdx) { fill.style.height = "100%"; fill.classList.add("ok"); }
+    else { fill.style.height = "0%"; fill.classList.remove("ok"); }
+  });
+  if (!calib) header.innerHTML = spoken ? `<span class="spoke">falou: ${spoken}</span>` : "Pisque para falar";
+  const bv = blinkEMA || 0;
+  blinkfill.style.width = Math.round(bv * 100) + "%";
+  blinkfill.style.background = bv > thr
+    ? "linear-gradient(90deg,#ff5a5a,#ff8f6b)" : "linear-gradient(90deg,#3ce65a,#7ef0a0)";
+  statusEl.textContent =
+    `piscada ${bv.toFixed(2)} · limiar ${thr.toFixed(2)} · vel ${(scanInterval / 1000).toFixed(1)}s · olho ${blinkSrc}`;
+}
+
+function tick() {
+  requestAnimationFrame(tick);
+  if (!running || !faceLandmarker || video.readyState < 2) return;
+  const now = performance.now();
+  let result;
+  try { result = faceLandmarker.detectForVideo(video, now); } catch (e) { return; }
+  const b = blinkScore(result);
+  if (b != null) blinkEMA = (blinkEMA == null) ? b : 0.5 * b + 0.5 * blinkEMA;
+
+  if (calib) { handleCalib(now); updateUI(); return; }
+
+  let blink = false; progress = 0;
+  if (blinkEMA != null) {
+    if (blinkEMA > thr) {
+      if (armed) {
+        if (closedSince == null) closedSince = now;
+        progress = (now - closedSince) / (CLOSE_SELECT * 1000);
+        if (progress >= 1 && now - lastSelect > REFRACT * 1000) {
+          blink = true; lastSelect = now; armed = false; closedSince = null;
+        }
+      }
+    } else { armed = true; closedSince = null; }
+  }
+
+  if (spoken && now >= holdUntil) { spoken = null; flashIdx = -1; }
+  if (now >= holdUntil && now - lastScan >= scanInterval) { lastScan = now; idx = (idx + 1) % PHRASES.length; }
+  if (blink) selectIndex(idx);
+  updateUI();
+}
+
+async function start() {
+  const errEl = document.getElementById("err");
+  try {
+    thr = parseFloat(localStorage.getItem("blinkThr")) || thr;
+    blinkSrc = localStorage.getItem("blinkSrc") || blinkSrc;
+    setEyeLabel();
+    speak(" ");  // destrava o audio do iOS dentro do gesto
+
+    video = document.getElementById("cam");
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    video.srcObject = stream;
+    await video.play();
+
+    statusEl.textContent = "carregando modelo…";
+    const vision = await FilesetResolver.forVisionTasks(WASM_URL);
+    const opts = (delegate) => ({ baseOptions: { modelAssetPath: MODEL_URL, delegate },
+      runningMode: "VIDEO", numFaces: 1, outputFaceBlendshapes: true });
+    try { faceLandmarker = await FaceLandmarker.createFromOptions(vision, opts("GPU")); }
+    catch (e) { faceLandmarker = await FaceLandmarker.createFromOptions(vision, opts("CPU")); }
+
+    document.getElementById("overlay").classList.add("hidden");
+    running = true; lastScan = performance.now(); tick();
+  } catch (e) {
+    errEl.textContent = "Erro: " + (e && e.message ? e.message : e)
+      + "  — precisa de HTTPS e permissão de câmera.";
+  }
+}
+
+function setEyeLabel() {
+  document.getElementById("eyebtn").textContent =
+    "Olho: " + (blinkSrc === "left" ? "esq." : blinkSrc === "max" ? "ambos" : "dir.");
+}
+
+// --- Editor de palavras (somente mouse/teclado) ---
+const editor = document.getElementById("editor");
+const editrows = document.getElementById("editrows");
+const escAttr = s => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;")
+  .replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+function openEditor() {
+  editrows.innerHTML = PHRASES.map((p, i) => `
+    <div class="editrow">
+      <input class="ed-icon" data-i="${i}" value="${escAttr(p.icon)}" maxlength="4" aria-label="Emoji ${i + 1}">
+      <input class="ed-label" data-i="${i}" value="${escAttr(p.label)}" aria-label="Palavra ${i + 1}">
+    </div>`).join("");
+  editor.classList.remove("hidden");
+  const first = editrows.querySelector(".ed-label");
+  if (first) first.focus();
+}
+
+function saveEditor() {
+  editrows.querySelectorAll(".editrow").forEach((row, i) => {
+    const icon = row.querySelector(".ed-icon").value.trim();
+    const label = row.querySelector(".ed-label").value.trim();
+    if (label) { PHRASES[i].label = label; PHRASES[i].say = label; }
+    if (icon)  { PHRASES[i].icon = icon; }
+    cells[i].querySelector(".lbl").textContent = PHRASES[i].label;
+    cells[i].querySelector(".icon").textContent = PHRASES[i].icon;
+  });
+  try {
+    localStorage.setItem(PHRASE_KEY,
+      JSON.stringify(PHRASES.map(p => ({ label: p.label, say: p.say, icon: p.icon }))));
+  } catch (e) {}
+  editor.classList.add("hidden");
+}
+
+document.getElementById("editbtn").addEventListener("click", openEditor);
+document.getElementById("editcancel").addEventListener("click", () => editor.classList.add("hidden"));
+document.getElementById("editsave").addEventListener("click", saveEditor);
+editor.addEventListener("click", e => { if (e.target === editor) editor.classList.add("hidden"); });
+
+document.getElementById("startbtn").addEventListener("click", start);
+document.getElementById("calibbtn").addEventListener("click", () => { if (running) startCalib(); });
+document.getElementById("faster").addEventListener("click", () => { scanInterval = Math.max(500, scanInterval - 100); updateUI(); });
+document.getElementById("slower").addEventListener("click", () => { scanInterval = Math.min(3000, scanInterval + 100); updateUI(); });
+document.getElementById("eyebtn").addEventListener("click", () => {
+  blinkSrc = blinkSrc === "right" ? "left" : blinkSrc === "left" ? "max" : "right";
+  localStorage.setItem("blinkSrc", blinkSrc); setEyeLabel();
+});
+</script>
+</body>
+</html>
